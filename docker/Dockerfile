@@ -69,7 +69,7 @@ RUN conda init bash
 # create and activate conda environment in a single layer
 RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
     conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
-    conda create -n hunyuan3d21 python=3.11 && \
+    conda create -n hunyuan3d21 python=3.10 && \
     echo "source activate hunyuan3d21" > ~/.bashrc
 
 ENV PATH="/workspace/miniconda3/envs/hunyuan3d21/bin:${PATH}"
