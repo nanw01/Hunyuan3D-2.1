@@ -85,10 +85,8 @@ RUN pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url h
 # Clone repo, install dependencies, and run setup scripts in a single layer
 RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git && \
     cd Hunyuan3D-2.1 && \
-    # Upgrade pip, setuptools, and wheel
-    pip install --upgrade pip setuptools wheel && \
-    # Fix bpy version for Python 3.10 compatibility using a more robust sed command
-    sed -i 's/^bpy.*/bpy==4.0.0/' requirements.txt && \
+    # Fix bpy version for Python 3.10 compatibility
+    sed -i 's/blender-bpy==4.5.1/blender-bpy==4.0.0/' requirements.txt && \
     pip install -r requirements.txt && \
     # Install custom_rasterizer
     cd hy3dpaint/custom_rasterizer && \
@@ -103,7 +101,7 @@ RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git && \
     mkdir -p ckpt && \
     wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P ckpt && \
     # Modify config paths
-    sed -i 's/self.multiview_cfg_path = "cfgs\/hunyuan-paint-pbr.yaml"/self.multiview_cfg_path = "hy3dpaint\/cfgs\/hunyuan-paint-pbr.yaml"/' textureGenPipeline.py && \
+    sed -i 's/self.multiview_cfg_path = "cfgs/hunyuan-paint-pbr.yaml"/self.multiview_cfg_path = "hy3dpaint/cfgs/hunyuan-paint-pbr.yaml"/' textureGenPipeline.py && \
     cd /workspace/Hunyuan3D-2.1/hy3dpaint/utils && \
     sed -i 's/custom_pipeline = config.custom_pipeline/custom_pipeline = os.path.join(os.path.dirname(__file__),"..","hunyuanpaintpbr")/' multiview_utils.py
 
