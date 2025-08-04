@@ -79,20 +79,18 @@ RUN conda config --set always_yes true && \
     conda install Ninja cuda -c nvidia/label/cuda-12.4.1 && \
     conda install -c conda-forge libstdcxx-ng
 
-# Install PyTorch
-RUN pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
-
 # Clone repo, install dependencies, and run setup scripts in a single layer
 RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git && \
     cd Hunyuan3D-2.1 && \
     # Upgrade pip, setuptools, and wheel
     pip install --upgrade pip setuptools wheel && \
+    pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124 && \
     pip install -r requirements.txt && \
     # Install custom_rasterizer
     cd hy3dpaint/custom_rasterizer && \
     export TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0" && \
     export CUDA_NVCC_FLAGS="-allow-unsupported-compiler" && \
-    pip install -e . && \
+    pip install -e . --use-pep517 && \
     # Install DifferentiableRenderer
     cd /workspace/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer && \
     bash compile_mesh_painter.sh && \
