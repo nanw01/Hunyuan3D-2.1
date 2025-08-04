@@ -87,8 +87,6 @@ RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git && \
     cd Hunyuan3D-2.1 && \
     # Upgrade pip, setuptools, and wheel
     pip install --upgrade pip setuptools wheel && \
-    # Fix bpy version for Python 3.10 compatibility using a more robust sed command
-    sed -i 's/^bpy.*/bpy==4.0.0/' requirements.txt && \
     pip install -r requirements.txt && \
     # Install custom_rasterizer
     cd hy3dpaint/custom_rasterizer && \
