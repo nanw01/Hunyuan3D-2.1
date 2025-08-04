@@ -7,43 +7,13 @@ LABEL name="hunyuan3d21" maintainer="hunyuan3d21"
 RUN mkdir -p /workspace
 WORKDIR /workspace
 
-# Update package lists and install all dependencies in a single layer
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
-    wget \
-    vim \
-    libegl1-mesa-dev \
-    libglib2.0-0 \
-    unzip \
-    git-lfs \
-    pkg-config \
-    libglvnd0 \
-    libgl1 \
-    libglx0 \
-    libegl1 \
-    libgles2 \
-    libglvnd-dev \
-    libgl1-mesa-dev \
-    libegl1-mesa-dev \
-    libgles2-mesa-dev \
-    cmake \
-    curl \
-    mesa-utils-extra \
-    libxrender1 \
-    libeigen3-dev \
-    python3-dev \
-    python3-setuptools \
-    libcgal-dev \
-    libxi6 \
-    libgconf-2-4 \
-    libxkbcommon-x11-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    # Clean up apt cache to reduce image size
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# update package lists and install git, wget, vim, libegl1-mesa-dev, and libglib2.0-0
+RUN apt-get update && apt-get install -y build-essential git wget vim libegl1-mesa-dev libglib2.0-0 unzip git-lfs
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends pkg-config libglvnd0 libgl1 libglx0 libegl1 libgles2 libglvnd-dev libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev cmake curl mesa-utils-extra libxrender1
+
+# Install additional dependencies for compilation
+RUN apt-get install -y libeigen3-dev python3-dev python3-setuptools libcgal-dev
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -62,54 +32,69 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh &
     ./Miniconda3-latest-Linux-x86_64.sh -b -p /workspace/miniconda3 && \
     rm Miniconda3-latest-Linux-x86_64.sh
 
-# update PATH environment variable and initialize conda
+# update PATH environment variable
 ENV PATH="/workspace/miniconda3/bin:${PATH}"
+
+# initialize conda
 RUN conda init bash
 
-# create and activate conda environment in a single layer
+# conda accept all channel
 RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
-    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
-    conda create -n hunyuan3d21 python=3.10 && \
-    echo "source activate hunyuan3d21" > ~/.bashrc
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 
+# create and activate conda environment
+RUN conda create -n hunyuan3d21 python=3.10 && echo "source activate hunyuan3d21" > ~/.bashrc
 ENV PATH="/workspace/miniconda3/envs/hunyuan3d21/bin:${PATH}"
 
-# Set conda to always auto-approve and install conda packages in a single layer
-RUN conda config --set always_yes true && \
-    conda install Ninja cuda -c nvidia/label/cuda-12.4.1 && \
-    conda install -c conda-forge libstdcxx-ng
+# Set conda to always auto-approve
+RUN conda config --set always_yes true
 
-# Install PyTorch
+RUN conda install Ninja
+RUN conda install cuda -c nvidia/label/cuda-12.4.1 -y
+
+# Update libstdcxx-ng to fix compatibility issues (auto-confirm)
+RUN conda install -c conda-forge libstdcxx-ng -y
+
 RUN pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
 
-# Clone repo, install dependencies, and run setup scripts in a single layer
-RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git && \
-    cd Hunyuan3D-2.1 && \
-    # Fix bpy version for Python 3.10 compatibility
-    sed -i 's/blender-bpy==4.5.1/blender-bpy==4.0.0/' requirements.txt && \
-    pip install -r requirements.txt && \
-    # Install custom_rasterizer
-    cd hy3dpaint/custom_rasterizer && \
+# Clone Hunyuan3D-2.1 repository
+RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git
+
+# Install Python dependencies from modified requirements.txt
+RUN pip install -r Hunyuan3D-2.1/requirements.txt
+
+# Install custom_rasterizer
+RUN cd /workspace/Hunyuan3D-2.1/hy3dpaint/custom_rasterizer && \
+    # Set compilation environment variables
     export TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0" && \
     export CUDA_NVCC_FLAGS="-allow-unsupported-compiler" && \
-    pip install -e . && \
-    # Install DifferentiableRenderer
-    cd /workspace/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer && \
-    bash compile_mesh_painter.sh && \
-    # Download RealESRGAN model
-    cd /workspace/Hunyuan3D-2.1/hy3dpaint && \
+    # Install with editable mode
+    pip install -e .
+
+# Install DifferentiableRenderer
+RUN cd /workspace/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer && \
+    bash compile_mesh_painter.sh
+
+# Create ckpt folder in hy3dpaint and download RealESRGAN model
+RUN cd /workspace/Hunyuan3D-2.1/hy3dpaint && \
     mkdir -p ckpt && \
-    wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P ckpt && \
-    # Modify config paths
-    sed -i 's/self.multiview_cfg_path = "cfgs/hunyuan-paint-pbr.yaml"/self.multiview_cfg_path = "hy3dpaint/cfgs/hunyuan-paint-pbr.yaml"/' textureGenPipeline.py && \
-    cd /workspace/Hunyuan3D-2.1/hy3dpaint/utils && \
-    sed -i 's/custom_pipeline = config.custom_pipeline/custom_pipeline = os.path.join(os.path.dirname(__file__),"..","hunyuanpaintpbr")/' multiview_utils.py
+    wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P ckpt
+
+# Modify textureGenPipeline.py to update config path
+RUN cd /workspace/Hunyuan3D-2.1/hy3dpaint && \
+    sed -i 's/self\.multiview_cfg_path = "cfgs\/hunyuan-paint-pbr\.yaml"/self.multiview_cfg_path = "hy3dpaint\/cfgs\/hunyuan-paint-pbr.yaml"/' textureGenPipeline.py
+
+# Modify multiview_utils.py to update custom_pipeline path
+RUN cd /workspace/Hunyuan3D-2.1/hy3dpaint/utils && \
+    sed -i 's/custom_pipeline = config\.custom_pipeline/custom_pipeline = os.path.join(os.path.dirname(__file__),"..","hunyuanpaintpbr")/' multiview_utils.py
 
 # Set working directory to the cloned repository
 WORKDIR /workspace/Hunyuan3D-2.1
 
 # Set global library paths to ensure proper linking at runtime
 ENV LD_LIBRARY_PATH="/workspace/miniconda3/envs/hunyuan3d21/lib:${LD_LIBRARY_PATH}"
+
+RUN apt-get install -y libxi6 libgconf-2-4 libxkbcommon-x11-0 libsm6 libxext6 libxrender-dev
 
 # Activate conda environment by default
 RUN echo "conda activate hunyuan3d21" >> ~/.bashrc
@@ -119,7 +104,9 @@ SHELL ["/bin/bash", "--login", "-c"]
 EXPOSE 7860
 
 # Cleanup
-RUN rm -f /workspace/*.zip
+RUN rm -f /workspace/*.zip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set default command
 WORKDIR /workspace/Hunyuan3D-2.1
