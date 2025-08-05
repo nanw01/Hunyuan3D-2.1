@@ -41,7 +41,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     libsm6 \
     libxext6 \
     libxrender-dev \
-    # Clean up apt cache to reduce image size
+    # Clean up apt cache to reduce image size \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -75,33 +75,36 @@ RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkg
 ENV PATH="/workspace/miniconda3/envs/hunyuan3d21/bin:${PATH}"
 
 # Set conda to always auto-approve and install conda packages in a single layer
-RUN conda config --set always_yes true && \
-    conda install Ninja cuda -c nvidia/label/cuda-12.4.1 && \
-    conda install -c conda-forge libstdcxx-ng
+RUN conda install -c conda-forge mamba -y && \
+    mamba install Ninja cuda -c nvidia -y && \
+    mamba install -c conda-forge libstdcxx-ng -y
 
-# Clone repo, install dependencies, and run setup scripts in a single layer
-RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git && \
-    cd Hunyuan3D-2.1 && \
-    # Upgrade pip, setuptools, and wheel
-    pip install --upgrade pip setuptools wheel && \
-    pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124 && \
-    pip install -r requirements.txt && \
-    # Install custom_rasterizer
-    cd hy3dpaint/custom_rasterizer && \
-    export TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0" && \
+# Clone the specific branch of the repository
+RUN git clone -b main-gemini https://github.com/nanw01/Hunyuan3D-2.1.git
+WORKDIR /workspace/Hunyuan3D-2.1
+
+# Upgrade pip and install python dependencies
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+RUN pip install -r requirements.txt
+
+# Install custom_rasterizer
+WORKDIR /workspace/Hunyuan3D-2.1/hy3dpaint/custom_rasterizer
+RUN export TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0" && \
     export CUDA_NVCC_FLAGS="-allow-unsupported-compiler" && \
-    pip install -e . --use-pep517 && \
-    # Install DifferentiableRenderer
-    cd /workspace/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer && \
-    bash compile_mesh_painter.sh && \
-    # Download RealESRGAN model
-    cd /workspace/Hunyuan3D-2.1/hy3dpaint && \
-    mkdir -p ckpt && \
-    wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P ckpt && \
-    # Modify config paths
-    sed -i 's/self.multiview_cfg_path = "cfgs\/hunyuan-paint-pbr.yaml"/self.multiview_cfg_path = "hy3dpaint\/cfgs\/hunyuan-paint-pbr.yaml"/' textureGenPipeline.py && \
-    cd /workspace/Hunyuan3D-2.1/hy3dpaint/utils && \
-    sed -i 's/custom_pipeline = config.custom_pipeline/custom_pipeline = os.path.join(os.path.dirname(__file__),"..","hunyuanpaintpbr")/' multiview_utils.py
+    pip install --no-build-isolation -e . --use-pep517
+
+# Install DifferentiableRenderer
+WORKDIR /workspace/Hunyuan3D-2.1/hy3dpaint/DifferentiableRenderer
+RUN bash compile_mesh_painter.sh
+
+# Download RealESRGAN model and modify config paths
+WORKDIR /workspace/Hunyuan3D-2.1/hy3dpaint
+RUN mkdir -p ckpt && \
+    wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P ckpt
+RUN sed -i 's/self.multiview_cfg_path = "cfgs\/hunyuan-paint-pbr.yaml"/self.multiview_cfg_path = "hy3dpaint\/cfgs\/hunyuan-paint-pbr.yaml"/' textureGenPipeline.py
+WORKDIR /workspace/Hunyuan3D-2.1/hy3dpaint/utils
+RUN sed -i 's/custom_pipeline = config.custom_pipeline/custom_pipeline = os.path.join(os.path.dirname(__file__),"..","hunyuanpaintpbr")/' multiview_utils.py
 
 # Set working directory to the cloned repository
 WORKDIR /workspace/Hunyuan3D-2.1
