@@ -80,7 +80,7 @@ RUN conda install -c conda-forge mamba -y && \
     mamba install -c conda-forge libstdcxx-ng -y
 
 # Clone the specific branch of the repository
-RUN git clone -b main-gemini https://github.com/nanw01/Hunyuan3D-2.1.git
+RUN git clone https://github.com/nanw01/Hunyuan3D-2.1.git
 WORKDIR /workspace/Hunyuan3D-2.1
 
 # Upgrade pip and install python dependencies
